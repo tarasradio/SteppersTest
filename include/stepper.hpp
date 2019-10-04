@@ -6,13 +6,18 @@
 class Stepper
 {
 public:
+    Stepper(volatile uint8_t *port, uint8_t stepPin, uint8_t dirPin);
     Stepper();
     void resetInfo();
     void reset();
-    void (*dirFunc)(byte);
-    void (*stepFunc)();
+    void setDir(uint8_t dir);
+    void doStep();
     bool updateState();
     void setCorrection(unsigned int correction);
+
+    volatile uint8_t * _port;
+    volatile uint8_t _stepPin;
+    volatile uint8_t _dirPin;
 
     float acceleration;
     unsigned int minStepInterval;   // ie. max speed, smaller is faster

@@ -5,6 +5,26 @@ Stepper::Stepper()
     resetInfo();
 }
 
+Stepper::Stepper(volatile uint8_t *port, uint8_t stepPin, uint8_t dirPin)
+{
+    Stepper();
+    _port = port;
+    _stepPin = stepPin;
+    _dirPin = dirPin;
+}
+
+void Stepper::setDir(uint8_t dir)
+{
+    if(dir == 0) (*_port) = ~(1 << _dirPin) & (*_port);
+    else (*_port) = (1 << _dirPin) | (*_port);
+}
+
+void Stepper::doStep()
+{
+    (*_port) = (1 << _stepPin) | (*_port);
+    (*_port) = ~(1 << _stepPin) & (*_port);
+}
+
 void Stepper::resetInfo()
 {
     n = 0;
@@ -32,7 +52,7 @@ bool Stepper::updateState()
 {
     if (stepCount < totalSteps ) 
     {
-      stepFunc();
+      doStep();
       stepCount++;
       stepPosition += dir;
 
