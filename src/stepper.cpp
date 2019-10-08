@@ -3,20 +3,25 @@
 Stepper::Stepper()
 {
     resetInfo();
+    moveState = MOVE_STATE_STOP;
 }
 
-Stepper::Stepper(volatile uint8_t *port, uint8_t stepPin, uint8_t dirPin)
+Stepper::Stepper(volatile uint8_t *port, uint8_t stepPin, uint8_t dirPin, uint8_t homePin)
 {
     Stepper();
     _port = port;
     _stepPin = stepPin;
     _dirPin = dirPin;
+    _homePin = homePin;
 }
 
 void Stepper::setDir(uint8_t dir)
 {
-    if(dir == 0) (*_port) = ~(1 << _dirPin) & (*_port);
-    else (*_port) = (1 << _dirPin) | (*_port);
+    this->dir = dir;
+    if (dir == 0)
+        (*_port) = ~(1 << _dirPin) & (*_port);
+    else
+        (*_port) = (1 << _dirPin) | (*_port);
 }
 
 void Stepper::doStep()
@@ -50,44 +55,75 @@ void Stepper::reset()
 
 bool Stepper::updateState()
 {
-    if (stepCount < totalSteps ) 
+    switch (this->moveState)
     {
-      doStep();
-      stepCount++;
-      stepPosition += dir;
+    case MOVE_STATE_MOVE:
+        updateMoveState();
+        break;
 
-      if (stepCount >= totalSteps ) 
-      {
-        movementDone = true;
-      }
+    case MOVE_STATE_RUN:
+        updateRunState();
+        break;
+
+    case MOVE_STATE_HOME:
+        updateHomeState();
+        break;
+    
+    default:
+        break;
     }
 
-    if ( rampUpStepCount == 0 ) 
-    {
-      n++;
-      d = d - (2 * d) / (4 * n + 1);
-      if ( d <= minStepInterval ) 
-      {
-        d = minStepInterval;
-        rampUpStepCount = stepCount;
-      }
-      if ( stepCount >= totalSteps / 2 ) 
-      {
-        rampUpStepCount = stepCount;
-      }
-    }
-    else if ( stepCount >= totalSteps - rampUpStepCount ) 
-    {
-      d = (d * (4 * n + 1)) / (4 * n + 1 - 2);
-      n--;
-    }
-
-    di = d; // integer
-
+    di = d;
+    
     return movementDone;
 }
 
-void Stepper::setCorrection(unsigned int correction)
+void Stepper::updateMoveState()
 {
-    di -= correction;
+    if (stepCount < totalSteps)
+    {
+        doStep();
+        stepCount++;
+        stepPosition += dir;
+
+        if (stepCount >= totalSteps)
+        {
+            movementDone = true;
+        }
+    }
+
+    if (rampUpStepCount == 0)
+    {
+        n++;
+        d = d - (2 * d) / (4 * n + 1);
+        if (d <= minStepInterval)
+        {
+            d = minStepInterval;
+            rampUpStepCount = stepCount;
+        }
+        if (stepCount >= totalSteps / 2)
+        {
+            rampUpStepCount = stepCount;
+        }
+    }
+    else if (stepCount >= totalSteps - rampUpStepCount)
+    {
+        d = (d * (4 * n + 1)) / (4 * n + 1 - 2);
+        n--;
+    }
+}
+
+void Stepper::updateRunState()
+{
+    doStep();
+}
+
+void Stepper::updateHomeState()
+{
+    doStep();
+}
+
+void Stepper::decreaseInterval(unsigned int value)
+{
+    di -= value;
 }
