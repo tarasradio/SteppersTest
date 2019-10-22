@@ -1,31 +1,43 @@
 #ifndef steppers_controller_hpp
 #define steppers_controller_hpp
 
+#include <Arduino.h>
 #include "stepper.hpp"
 
-#include <Arduino.h>
-
-#define NUM_STEPPERS 3
+#define NUM_STEPPERS 5
+#define NUM_FAKE_STEPPERS 8
 
 class SteppersController
 {
 public:
+    enum ControlState
+    {
+        HAND_CONTROL,
+        CNC_CONTROL
+    };
+
     SteppersController();
     void init();
     void interruptHandler();
 
-    void setSpeed(uint8_t stepper, unsigned int stepsPerSecond);
-    void setMinSpeed(uint8_t stepper, unsigned int stepsPerSecond);
-    void move(uint8_t stepper, long steps);
-    void run(uint8_t stepper, int speed);
-    void home(uint8_t stepper, int speed);
-    void stop(uint8_t stepper);
+    void setSpeed(int8_t stepper, unsigned int stepsPerSecond);
+    void setMinSpeed(int8_t stepper, unsigned int stepsPerSecond);
+    void move(int8_t stepper, long steps);
+    void run(int8_t stepper, int speed);
+    void home(int8_t stepper, int speed);
+    void stop(int8_t stepper);
+
+    void PrintSteppers();
 
     void runAndWait();
+    void setControlMode(uint8_t mode);
+    uint8_t getControlMode();
 private:
     void initPins();
     void initTimer();
     void initSteppers();
+
+    int tryStepper(int8_t stepper, uint8_t needsRun);
 
     void setNextInterruptInterval();
 
@@ -33,8 +45,12 @@ private:
     uint8_t nextStepper(uint8_t number);
 
     Stepper steppers[NUM_STEPPERS];
-    volatile byte remainingSteppersFlag = 0;
-    volatile byte nextStepperFlag = 0;
+    byte remainingSteppersFlag;
+    byte nextStepperFlag;
+
+    uint8_t fakeSteppers[8];
+
+    uint8_t _currentMode;
 };
 
 #endif

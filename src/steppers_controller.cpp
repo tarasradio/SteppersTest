@@ -1,4 +1,6 @@
 #include "steppers_controller.hpp"
+#include "relays.hpp"
+#include "stepper.hpp"
 
 #define X_PORT PORTB
 #define X_DDR DDRB
@@ -22,20 +24,25 @@
 
 #define B_PORT PORTE
 #define B_DDR DDRE
-#define B_DIR_PIN 1
-#define B_STEP_PIN 3
-
-#define C_PORT PORTE
-#define C_DDR DDRE
-#define C_DIR_PIN 4
-#define C_STEP_PIN 5
+#define B_DIR_PIN 4
+#define B_STEP_PIN 5
 
 #define TIMER1_INTERRUPTS_ON TIMSK1 |= (1 << OCIE1A)
 #define TIMER1_INTERRUPTS_OFF TIMSK1 &= ~(1 << OCIE1A)
 
 SteppersController::SteppersController()
 {
-    
+    _currentMode = HAND_CONTROL;
+}
+
+void SteppersController::setControlMode(uint8_t mode)
+{
+    this->_currentMode = mode;
+}
+
+uint8_t SteppersController::getControlMode()
+{
+    return this->_currentMode;
 }
 
 void SteppersController::init()
@@ -54,7 +61,6 @@ void SteppersController::initPins()
     Z_DDR |= (1 << Z_DIR_PIN) | (1 << Z_STEP_PIN);
     A_DDR |= (1 << A_DIR_PIN) | (1 << A_STEP_PIN);
     B_DDR |= (1 << B_DIR_PIN) | (1 << B_STEP_PIN);
-    C_DDR |= (1 << C_DIR_PIN) | (1 << C_STEP_PIN);
 }
 
 void SteppersController::initTimer()
@@ -78,54 +84,104 @@ void SteppersController::initSteppers()
     steppers[0] = Stepper(&X_PORT, X_STEP_PIN, X_DIR_PIN, 0);
     steppers[1] = Stepper(&Y_PORT, Y_STEP_PIN, Y_DIR_PIN, 0);
     steppers[2] = Stepper(&Z_PORT, Z_STEP_PIN, Z_DIR_PIN, 0);
+    steppers[3] = Stepper(&A_PORT, A_STEP_PIN, A_DIR_PIN, 0);
+    steppers[4] = Stepper(&B_PORT, B_STEP_PIN, B_DIR_PIN, 0);
 
-    steppers[0].acceleration = 100;
-    steppers[0].minStepInterval = 250;
+    for(uint8_t i = 0; i < NUM_STEPPERS; i++)
+    {
+        steppers[i].acceleration = 100;
+        steppers[i].minStepInterval = 250;
+    }
 
-    steppers[1].acceleration = 100;
-    steppers[1].minStepInterval = 250;
-
-    steppers[2].acceleration = 100;
-    steppers[2].minStepInterval = 250;
+    for(uint8_t i = 0; i < 8; i++)
+        fakeSteppers[i] = 0;
 }
 
-void SteppersController::move(uint8_t stepper, long steps)
+int SteppersController::tryStepper(int8_t stepper, uint8_t needsRun)
 {
-    steppers[stepper].setMoveState(MOVE_STATE_MOVE);
-
-    steppers[stepper].setDir(steps < 0 ? 1 : 0);
-    steppers[stepper].setSteps( abs(steps) );
-    steppers[stepper].reset();
-
-    remainingSteppersFlag |= (1 << stepper);
-}
-
-void SteppersController::run(uint8_t stepper, int speed)
-{
-    steppers[stepper].setMoveState(MOVE_STATE_RUN);
-
-    steppers[stepper].setDir(speed < 0 ? 1 : 0);
-    setMinSpeed(stepper, abs(speed));
-    setSpeed(stepper, abs(speed));
-    steppers[stepper].reset();
+    if(stepper >= 8) 
+    {
+        return -1;
+    }
     
-    remainingSteppersFlag |= (1 << stepper);
+    if( (stepper >=  NUM_STEPPERS) && (fakeSteppers[stepper - 3] == 0) )
+    {
+        if(needsRun == 1)
+            Relays::RelayOn(12 - stepper);
+        stepper -= 3;
+    }
+    else if( (stepper < NUM_STEPPERS) && (fakeSteppers[stepper + 3] == 0) )
+    {
+        if(needsRun == 1)
+            Relays::RelayOff(9 - stepper);
+    }
+    else
+    {
+        return -1;
+    }
+
+    return stepper;
 }
 
-void SteppersController::home(uint8_t stepper, int speed)
+void SteppersController::move(int8_t stepper, long steps)
 {
-    steppers[stepper].setDir(speed < 0 ? 1 : 0);
-    setSpeed(stepper, abs(speed));
-    steppers[stepper].reset();
+    int8_t realStepper = tryStepper(stepper, 1);
+    if(realStepper < 0)
+        return;
     
-    steppers[stepper].setMoveState(MOVE_STATE_HOME);
-    remainingSteppersFlag |= (1 << stepper);
+    steppers[realStepper].setMoveState(MOVE_STATE_MOVE);
+
+    steppers[realStepper].setDir(steps < 0 ? 1 : 0);
+    steppers[realStepper].setSteps( abs(steps) );
+    steppers[realStepper].reset();
+
+    remainingSteppersFlag |= (1 << realStepper);
 }
 
-void SteppersController::stop(uint8_t stepper)
+void SteppersController::run(int8_t stepper, int speed)
 {
-    steppers[stepper].setMoveState(MOVE_STATE_STOP);
-    remainingSteppersFlag &= ~(1 << stepper);
+    int8_t realStepper = tryStepper(stepper, 1);
+    if(realStepper < 0)
+        return;
+
+    fakeSteppers[stepper] = 1;
+    
+    steppers[realStepper].setMoveState(MOVE_STATE_RUN);
+
+    steppers[realStepper].setDir(speed < 0 ? 1 : 0);
+    setMinSpeed(realStepper, abs(speed));
+    setSpeed(realStepper, abs(speed));
+    steppers[realStepper].reset();
+    
+    remainingSteppersFlag |= (1 << realStepper);
+}
+
+void SteppersController::home(int8_t stepper, int speed)
+{
+    int8_t realStepper = tryStepper(stepper, 1);
+    if(realStepper < 0)
+        return;
+
+    fakeSteppers[stepper] = 1;
+    
+    steppers[realStepper].setDir(speed < 0 ? 1 : 0);
+    setSpeed(realStepper, abs(speed));
+    steppers[realStepper].reset();
+    
+    steppers[realStepper].setMoveState(MOVE_STATE_HOME);
+    remainingSteppersFlag |= (1 << realStepper);
+}
+
+void SteppersController::stop(int8_t stepper)
+{
+    int8_t realStepper = tryStepper(stepper, 0);
+    if(realStepper < 0)
+        return;
+
+    fakeSteppers[stepper] = 0;
+
+    steppers[realStepper].setMoveState(MOVE_STATE_STOP);
+    remainingSteppersFlag &= ~(1 << realStepper);
 }
 
 void SteppersController::setNextInterruptInterval()
@@ -178,7 +234,6 @@ void SteppersController::interruptHandler()
         if (steppers[number].updateState() == true) // true => movement done
         {
             stop(number);
-            Serial.println("stop");
         }
     }
 
@@ -196,14 +251,14 @@ void SteppersController::runAndWait()
     }
 }
 
-void SteppersController::setMinSpeed(uint8_t stepper, unsigned int stepsPerSecond)
+void SteppersController::setMinSpeed(int8_t stepper, unsigned int stepsPerSecond)
 {
     double period = 1e6 / stepsPerSecond;
     period = period * 0.25;
     steppers[stepper].acceleration = (unsigned int)period;
 }
 
-void SteppersController::setSpeed(uint8_t stepper, unsigned int stepsPerSecond)
+void SteppersController::setSpeed(int8_t stepper, unsigned int stepsPerSecond)
 {
     double period = 1e6 / stepsPerSecond;
     period = period * 0.25;
@@ -218,4 +273,13 @@ uint8_t SteppersController::remainingStepper(uint8_t number)
 uint8_t SteppersController::nextStepper(uint8_t number)
 {
     return (1 << number) & nextStepperFlag;
+}
+
+void SteppersController::PrintSteppers()
+{
+    for(uint8_t i = 0; i < 8; i++)
+    {
+        Serial.print(" S" + String(i) + ": " + String(fakeSteppers[i]));
+    }
+    Serial.println();
 }
