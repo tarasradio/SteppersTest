@@ -4,8 +4,8 @@
 #include <Arduino.h>
 #include "stepper.hpp"
 
-#define NUM_STEPPERS 5
-#define NUM_FAKE_STEPPERS 8
+#define NUM_STEPPERS 5 //5
+#define NUM_FAKE_STEPPERS 8 //8
 
 class SteppersController
 {
@@ -22,7 +22,7 @@ public:
 
     void setSpeed(int8_t stepper, unsigned int stepsPerSecond);
     void setMinSpeed(int8_t stepper, unsigned int stepsPerSecond);
-    void move(int8_t stepper, long steps);
+    void move(int8_t stepper, long steps, int speed);
     void run(int8_t stepper, int speed);
     void home(int8_t stepper, int speed);
     void stop(int8_t stepper);
@@ -45,10 +45,11 @@ private:
     uint8_t nextStepper(uint8_t number);
 
     Stepper steppers[NUM_STEPPERS];
+
     byte remainingSteppersFlag;
     byte nextStepperFlag;
 
-    uint8_t fakeSteppers[8];
+    uint8_t fakeSteppers[NUM_FAKE_STEPPERS];
 
     uint8_t _currentMode;
 };

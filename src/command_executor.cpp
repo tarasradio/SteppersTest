@@ -45,6 +45,7 @@ void CommandExecutor::listenPacket(uint8_t *packet, uint8_t packetLength)
                 executeMoveCommand(packet + 5, packetId);
             }
         }
+        break;
         case CMD_RUN:
         {
             if(checkMode() == 
@@ -92,14 +93,24 @@ uint16_t CommandExecutor::readInt(uint8_t *buffer)
 void CommandExecutor::executeMoveCommand(uint8_t *packet, uint32_t packetId)
 {
     int8_t stepper = packet[0];
-    int32_t steps = readLong(packet + 1);
+    int32_t speed = readLong(packet + 1);
+    int32_t steps = readLong(packet + 5);
 
-    _steppersController->move(stepper, steps);
+    if(speed < 0)
+    {
+        steps = -steps;
+    }
+
+    _steppersController->stop(stepper);
+    _steppersController->move(stepper, steps, abs(speed));
     
     {
         String message = "Move command: ";
         message += "stepper = " + String(stepper);
+        message += "speed = " + String(speed); 
         message += "steps = " + String(steps);
+
+        Serial.println(message);
 
         Protocol::SendMessage(message.c_str());
     }
@@ -116,6 +127,8 @@ void CommandExecutor::executeRunCommand(uint8_t *packet, uint32_t packetId)
         String message = "Run command: ";
         message += "stepper = " + String(stepper);
         message += "speed = " + String(fullSpeed);
+
+        Serial.println(message);
     
         Protocol::SendMessage(message.c_str());
     }
@@ -130,6 +143,7 @@ void CommandExecutor::executeStopCommand(uint8_t *packet, uint32_t packetId)
     {
         String message = "Stop command: ";
         message += "stepper = " + String(stepper);
+        Serial.println(message);
     
         Protocol::SendMessage(message.c_str());
     }

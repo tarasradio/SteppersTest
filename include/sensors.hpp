@@ -6,7 +6,9 @@
 class Sensors
 {
 public:
-    static int16_t getSensorValue(int sensorNumber);
+    static void Init();
+    static int16_t getSensorValue(uint8_t sensorNumber);
+    static uint8_t getSwitchState(uint8_t switchNumber);
 };
 
 #endif

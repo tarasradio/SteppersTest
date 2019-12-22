@@ -43,7 +43,7 @@ void PacketManager::WritePacketData(uint8_t byte)
     Serial.write(byte);
 }
 
-void PacketManager::WritePacketData(uint8_t *bytes, uint8_t bytesNumber)
+void PacketManager::WritePacketData(uint8_t const * bytes, uint8_t bytesNumber)
 {
     for(uint8_t i = 0; i < bytesNumber; i++)
     {

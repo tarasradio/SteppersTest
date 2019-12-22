@@ -32,6 +32,9 @@ void setup()
     controller.init();
     Relays::Init();
     Devices::Init();
+    Sensors::Init();
+
+    controller.setControlMode(SteppersController::CNC_CONTROL);
 
     controller.setMinSpeed(0, 400);
     controller.setMinSpeed(1, 400);
@@ -50,9 +53,20 @@ long deg360 = 1600;
 
 void loop()
 {
-
     packetManager.ReadPacket();
     packetManager.findByteStuffingPacket();
+
+    if(Sensors::getSwitchState(0) == 0)
+    {
+        controller.setControlMode(SteppersController::CNC_CONTROL);
+        //Serial.println("cnc control mode");
+    }
+    else
+    {
+        controller.setControlMode(SteppersController::HAND_CONTROL);
+        //Serial.println("hand control mode");
+    }
+    
 
     if(controller.getControlMode() == SteppersController::HAND_CONTROL)
     {
@@ -94,8 +108,6 @@ int getSpeed(uint16_t value)
 {
     return minSpeed + (float)value * ((float)(maxSpeed - minSpeed) / (float)(maxValue - minValue));
 }
-
-
 
 void updateStepperState(int8_t sensor, int8_t stepper)
 {

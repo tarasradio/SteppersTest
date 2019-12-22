@@ -1,6 +1,7 @@
 #include "steppers_controller.hpp"
 #include "relays.hpp"
 #include "stepper.hpp"
+#include "protocol.hpp"
 
 #define X_PORT PORTB
 #define X_DDR DDRB
@@ -27,6 +28,16 @@
 #define B_DIR_PIN 4
 #define B_STEP_PIN 5
 
+#define C_PORT PORTA
+#define C_DDR DDRA
+#define C_DIR_PIN 3
+#define C_STEP_PIN 1
+
+#define D_PORT PORTA
+#define D_DDR DDRA
+#define D_DIR_PIN 2
+#define D_STEP_PIN 0
+
 #define TIMER1_INTERRUPTS_ON TIMSK1 |= (1 << OCIE1A)
 #define TIMER1_INTERRUPTS_OFF TIMSK1 &= ~(1 << OCIE1A)
 
@@ -37,7 +48,14 @@ SteppersController::SteppersController()
 
 void SteppersController::setControlMode(uint8_t mode)
 {
+    if(mode == this->_currentMode)
+        return;
     this->_currentMode = mode;
+
+    for(uint8_t stepper = 0; stepper < NUM_STEPPERS; stepper++)
+    {
+        stop(stepper);
+    }
 }
 
 uint8_t SteppersController::getControlMode()
@@ -61,6 +79,9 @@ void SteppersController::initPins()
     Z_DDR |= (1 << Z_DIR_PIN) | (1 << Z_STEP_PIN);
     A_DDR |= (1 << A_DIR_PIN) | (1 << A_STEP_PIN);
     B_DDR |= (1 << B_DIR_PIN) | (1 << B_STEP_PIN);
+
+   // C_DDR |= (1 << C_DIR_PIN) | (1 << C_STEP_PIN);
+    //D_DDR |= (1 << D_DIR_PIN) | (1 << D_STEP_PIN);
 }
 
 void SteppersController::initTimer()
@@ -87,52 +108,95 @@ void SteppersController::initSteppers()
     steppers[3] = Stepper(&A_PORT, A_STEP_PIN, A_DIR_PIN, 0);
     steppers[4] = Stepper(&B_PORT, B_STEP_PIN, B_DIR_PIN, 0);
 
+    //steppers[5] = Stepper(&C_PORT, C_STEP_PIN, C_DIR_PIN, 0);
+    //steppers[6] = Stepper(&D_PORT, D_STEP_PIN, D_DIR_PIN, 0);
+
     for(uint8_t i = 0; i < NUM_STEPPERS; i++)
     {
         steppers[i].acceleration = 100;
         steppers[i].minStepInterval = 250;
     }
 
-    for(uint8_t i = 0; i < 8; i++)
+    for(uint8_t i = 0; i < NUM_FAKE_STEPPERS; i++)
         fakeSteppers[i] = 0;
 }
 
 int SteppersController::tryStepper(int8_t stepper, uint8_t needsRun)
 {
-    if(stepper >= 8) 
+    if(stepper >= NUM_FAKE_STEPPERS) 
     {
         return -1;
     }
     
-    if( (stepper >=  NUM_STEPPERS) && (fakeSteppers[stepper - 3] == 0) )
+    if( (stepper >= 5) && (fakeSteppers[stepper - 3] == 0) )
     {
         if(needsRun == 1)
-            Relays::RelayOn(12 - stepper);
+            Relays::RelayOn(12 - stepper); // 7, 6, 5
         stepper -= 3;
     }
-    else if( (stepper < NUM_STEPPERS) && (fakeSteppers[stepper + 3] == 0) )
+    else if( (stepper < 5) && (fakeSteppers[stepper + 3] == 0))
     {
         if(needsRun == 1)
-            Relays::RelayOff(9 - stepper);
+            Relays::RelayOff(9 - stepper); // 7, 6, 5
     }
+ /*    else if( (stepper >= 10) && (stepper < 12) && (fakeSteppers[stepper - 2] == 0) )
+    {
+        {String message = "stepper >= 10";
+        Protocol::SendMessage(message.c_str());}
+        if(needsRun == 1)
+            Relays::RelayOn(14 - stepper); // 4, 3
+        stepper -= 5;
+    }
+    else if( (stepper >= 8) && (fakeSteppers[stepper + 2] == 0))
+    {
+        {
+            String message = "stepper >= 8 && < 10 ";
+            Protocol::SendMessage(message.c_str());
+        }
+        
+        if(needsRun == 1)
+            Relays::RelayOff(12 - stepper); // 4, 3
+        stepper -= 3;
+    } */
     else
     {
         return -1;
     }
 
+/*     if( (stepper >=  NUM_STEPPERS) && (fakeSteppers[stepper - 5] == 0) )
+    {
+        if(needsRun == 1)
+            Relays::RelayOn(12 - stepper);//????
+        stepper -= 5;
+    }
+    else if( (stepper < NUM_STEPPERS) && (fakeSteppers[stepper + 5] == 0) )
+    {
+        if(needsRun == 1)
+            Relays::RelayOff(9 - stepper);//?????
+    }
+    else
+    {
+        return -1;
+    } */
+
+    {String message = "real stepper = " + String(stepper);
+        Protocol::SendMessage(message.c_str());}
     return stepper;
 }
 
-void SteppersController::move(int8_t stepper, long steps)
+void SteppersController::move(int8_t stepper, long steps, int speed)
 {
     int8_t realStepper = tryStepper(stepper, 1);
     if(realStepper < 0)
         return;
+
+    fakeSteppers[stepper] = 1;
     
     steppers[realStepper].setMoveState(MOVE_STATE_MOVE);
 
     steppers[realStepper].setDir(steps < 0 ? 1 : 0);
     steppers[realStepper].setSteps( abs(steps) );
+    setSpeed(realStepper, abs(speed));
     steppers[realStepper].reset();
 
     remainingSteppersFlag |= (1 << realStepper);
@@ -255,14 +319,14 @@ void SteppersController::setMinSpeed(int8_t stepper, unsigned int stepsPerSecond
 {
     double period = 1e6 / stepsPerSecond;
     period = period * 0.25;
-    steppers[stepper].acceleration = (unsigned int)period;
+    steppers[stepper].acceleration = static_cast<unsigned int>(period);
 }
 
 void SteppersController::setSpeed(int8_t stepper, unsigned int stepsPerSecond)
 {
     double period = 1e6 / stepsPerSecond;
     period = period * 0.25;
-    steppers[stepper].minStepInterval = (unsigned int)period;
+    steppers[stepper].minStepInterval = static_cast<unsigned int>(period);
 }
 
 uint8_t SteppersController::remainingStepper(uint8_t number)

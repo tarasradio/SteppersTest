@@ -5,6 +5,6 @@ void Protocol::SendMessage(const char* message)
 {
     PacketManager::WritePacketFlag();
     PacketManager::WritePacketData(0x10); // Пакет с сообщением
-    PacketManager::WritePacketData( (uint8_t*) message, strlen(message) );
+    PacketManager::WritePacketData( reinterpret_cast<const uint8_t *> (message), strlen(message) );
     PacketManager::WritePacketFlag();
 }
