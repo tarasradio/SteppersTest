@@ -8,21 +8,11 @@
 #include "sensors.hpp"
 #include "devices.hpp"
 
+int cmd = 0;
+
 CommandExecutor::CommandExecutor(SteppersController * steppersController)
 {
     this->_steppersController = steppersController;
-}
-
-uint8_t CommandExecutor::checkMode()
-{
-    uint8_t mode = _steppersController->getControlMode();
-    if(mode == SteppersController::HAND_CONTROL)
-    {
-        String message = "Error: hand control is active!";
-        Protocol::SendMessage(message.c_str());
-    }
-
-    return mode;
 }
 
 void CommandExecutor::listenPacket(uint8_t *packet, uint8_t packetLength)
@@ -35,33 +25,24 @@ void CommandExecutor::listenPacket(uint8_t *packet, uint8_t packetLength)
         Protocol::SendMessage(message.c_str());
     }
 
+    String message = "cmd = " + String(cmd++);
+    Protocol::SendMessage(message.c_str());
+
     switch (commandType)
     {
         case CMD_MOVE:
         {
-            if(checkMode() == 
-            SteppersController::CNC_CONTROL)
-            {
-                executeMoveCommand(packet + 5, packetId);
-            }
+            executeMoveCommand(packet + 5, packetId);
         }
         break;
         case CMD_RUN:
         {
-            if(checkMode() == 
-            SteppersController::CNC_CONTROL)
-            {
-                executeRunCommand(packet + 5, packetId);
-            }
+            executeRunCommand(packet + 5, packetId);
         }
         break;
         case CMD_STOP:
         {
-            if(checkMode() == 
-            SteppersController::CNC_CONTROL)
-            {
-                executeStopCommand(packet + 5, packetId);
-            }
+            executeStopCommand(packet + 5, packetId);
         }
         break;
         case CMD_SET_DEVICE_STATE:
@@ -110,8 +91,6 @@ void CommandExecutor::executeMoveCommand(uint8_t *packet, uint32_t packetId)
         message += "speed = " + String(speed); 
         message += "steps = " + String(steps);
 
-        Serial.println(message);
-
         Protocol::SendMessage(message.c_str());
     }
 }
@@ -128,8 +107,6 @@ void CommandExecutor::executeRunCommand(uint8_t *packet, uint32_t packetId)
         message += "stepper = " + String(stepper);
         message += "speed = " + String(fullSpeed);
 
-        Serial.println(message);
-    
         Protocol::SendMessage(message.c_str());
     }
 }
@@ -143,7 +120,6 @@ void CommandExecutor::executeStopCommand(uint8_t *packet, uint32_t packetId)
     {
         String message = "Stop command: ";
         message += "stepper = " + String(stepper);
-        Serial.println(message);
     
         Protocol::SendMessage(message.c_str());
     }

@@ -10,11 +10,6 @@
 class SteppersController
 {
 public:
-    enum ControlState
-    {
-        HAND_CONTROL,
-        CNC_CONTROL
-    };
 
     SteppersController();
     void init();
@@ -30,8 +25,6 @@ public:
     void PrintSteppers();
 
     void runAndWait();
-    void setControlMode(uint8_t mode);
-    uint8_t getControlMode();
 private:
     void initPins();
     void initTimer();
@@ -50,8 +43,6 @@ private:
     byte nextStepperFlag;
 
     uint8_t fakeSteppers[NUM_FAKE_STEPPERS];
-
-    uint8_t _currentMode;
 };
 
 #endif

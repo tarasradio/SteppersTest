@@ -19,7 +19,6 @@ private:
     void executeStopCommand(uint8_t *packet, uint32_t packetId);
     void executeSetDeviceStateCommand(uint8_t *packet, uint32_t packetId);
 
-    uint8_t checkMode();
 public:
     CommandExecutor() {}
     CommandExecutor(SteppersController * );

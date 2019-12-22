@@ -28,39 +28,12 @@
 #define B_DIR_PIN 4
 #define B_STEP_PIN 5
 
-#define C_PORT PORTA
-#define C_DDR DDRA
-#define C_DIR_PIN 3
-#define C_STEP_PIN 1
-
-#define D_PORT PORTA
-#define D_DDR DDRA
-#define D_DIR_PIN 2
-#define D_STEP_PIN 0
-
 #define TIMER1_INTERRUPTS_ON TIMSK1 |= (1 << OCIE1A)
 #define TIMER1_INTERRUPTS_OFF TIMSK1 &= ~(1 << OCIE1A)
 
 SteppersController::SteppersController()
 {
-    _currentMode = HAND_CONTROL;
-}
-
-void SteppersController::setControlMode(uint8_t mode)
-{
-    if(mode == this->_currentMode)
-        return;
-    this->_currentMode = mode;
-
-    for(uint8_t stepper = 0; stepper < NUM_STEPPERS; stepper++)
-    {
-        stop(stepper);
-    }
-}
-
-uint8_t SteppersController::getControlMode()
-{
-    return this->_currentMode;
+    
 }
 
 void SteppersController::init()

@@ -1,4 +1,5 @@
 #include "packet_manager.hpp"
+#include "protocol.hpp"
 
 #define PACKET_SIZE 64
 
@@ -23,6 +24,7 @@ void PacketManager::ReadPacket()
 {
     bufferTail = 0;
     uint8_t countBytes = Serial.available();
+
     if (countBytes > 0)
     {
         while (countBytes != 0)
@@ -30,6 +32,7 @@ void PacketManager::ReadPacket()
             buffer[bufferTail++] = Serial.read();
             countBytes--;
         }
+        Serial.flush();
     }
 }
 
@@ -72,9 +75,12 @@ void PacketManager::tryPacketBuild(uint8_t bufferPosition)
 void PacketManager::findByteStuffingPacket()
 {
     uint8_t position = 0;
-
+    
     while(position < bufferTail)
     {
+        String msg = "try find packet, tail = " + String(bufferTail) + "pos = " + String(position);
+        Protocol::SendMessage(msg.c_str());
+
         if(FlagSymbol == buffer[position])
         {
             if(escapeFlag)
@@ -83,7 +89,9 @@ void PacketManager::findByteStuffingPacket()
             }
             else
             {
-                _listener->listenPacket(packetBuffer, packetTail-1);
+                if(packetTail != 0)
+                    _listener->listenPacket(packetBuffer, packetTail-1);
+                
                 packetTail = 0;
             }
         }
